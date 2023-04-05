@@ -102,27 +102,31 @@ int main(int argc, char** argv)
     //counting different files with pattern
     std::vector< std::pair< int, fileline > > linesbycount;
 
-    int currentcount = 0;
+    int currentcount = 0, firstfound = 0;
     std::string currentpath = "";
     if( found.size() > 0 )
     {
-        currentpath = found[1].first;
+        currentpath = found[0].first;
         currentcount = 1;
+        firstfound = 0;
         for(int i = 1; i < (int)found.size(); i++)
         {
             if( found[i].first != found[i - 1].first )
             {
-                linesbycount.push_back( make_pair( currentcount, found[i - 1] ) );
+                for(int j = firstfound; j < i; j++)
+                    linesbycount.push_back( make_pair( currentcount, found[j] ) );
 
                 currentcount = 0;
                 currentpath = found[i].first;
+                firstfound = i;
 
                 files_with_pattern ++;
             }
             currentcount ++;
         }
 
-        linesbycount.push_back( make_pair( currentcount, found[ (int)found.size() - 1 ] ) );
+        for(int j = firstfound; j < (int)found.size(); j++)
+                    linesbycount.push_back( make_pair( currentcount, found[j] ) );
     }
 
     //sorting from most patterns
