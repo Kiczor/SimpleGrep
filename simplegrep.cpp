@@ -7,7 +7,6 @@
 #include <iostream>
 #include <fstream>
 #include <sys/time.h>
-#include <map>
 #include "ThreadPool.h"
 
 std::string logfilepath, resultfilepath, dirpath, pattern;
@@ -20,17 +19,13 @@ timeval start_time;
 typedef std::pair<std::string, std::pair<int, std::string> > fileline;
 
 std::vector<fileline> found;
-std::map<unsigned long long int, std::vector<std::string> > threadlogs;
+
+std::map<std::thread::id, std::vector<std::string> > threadlogs;
 
 std::mutex foundmutex;
 
 void SeekInFile( std::string path, std::string pattern )
 {
-    {
-         std::unique_lock<std::mutex> lock(foundmutex);
-         std::cout << "seeking in file: |" << path << "| for pattern: |" << pattern << "|\n";
-    }
-
     std::regex patternregex( pattern );
 
     std::ifstream filestream(path);
@@ -43,8 +38,6 @@ void SeekInFile( std::string path, std::string pattern )
         if( std::regex_search( line, patternregex ) )
         {
             std::unique_lock<std::mutex> lock(foundmutex);
-            std::cout << line << "\n";
-            //add to results (mutex chyba tu powinien byc)
             found.push_back( make_pair( path, make_pair( count, line ) ) );
         }
     }
@@ -106,18 +99,14 @@ int main(int argc, char** argv)
     ThreadPool* mythreadpool = new ThreadPool(threadnumber);
     for (const auto& direntry : std::filesystem::recursive_directory_iterator(fspath))
     {
-        std::cout << direntry << std::endl;
-        mythreadpool -> AddWork( [direntry] { SeekInFile( direntry.path(), pattern ); } );
+        mythreadpool -> AddWork( [direntry] { SeekInFile( direntry.path(), pattern ); }, direntry.path().filename() );
         searched_files += 1;
     }
     while( mythreadpool -> busy() ) {}
+    threadlogs = mythreadpool -> filelogs;
     delete mythreadpool;
 
     sort( found.begin(), found.end() );
-
-    //debugowanie
-    for(int i = 0; i < (int)found.size(); i++)
-        std::cout << found[i].first << " " << found[i].second.first << " " << found[i].second.second << "\n";
 
     //counting different files with pattern
     std::vector< std::pair< int, fileline > > linesbycount;
@@ -160,12 +149,28 @@ int main(int argc, char** argv)
         resultstream << fline.second.first << ":" << fline.second.second.first << ":" << fline.second.second.second << "\n";
     resultstream.close();
 
+    //writing logs to file
+    std::ofstream logstream;
+    logstream.open( logfilepath );
+    for(auto const& log : threadlogs)
+    {
+        logstream << log.first << ": ";
+        for(int i = 0; i < (int)log.second.size(); i++)
+        {
+            logstream << log.second[i];
+            if( i + 1 != (int)log.second.size() )
+                logstream << ",";
+        }
+        logstream << "\n";
+    }
+    logstream.close();
+
     //time counting
     timeval end_time, time_difference; gettimeofday( &end_time, 0 );
     timersub( &end_time, &start_time, &time_difference );
 
     //ending output
-    std::cout << "\n\nSearched files: " << searched_files << "\n";
+    std::cout << "Searched files: " << searched_files << "\n";
     std::cout << "Files with pattern: " << files_with_pattern << "\n";
     std::cout << "Patterns number: " << found.size() << "\n";
     std::cout << "Result file: " << resultfilepath << "\n";

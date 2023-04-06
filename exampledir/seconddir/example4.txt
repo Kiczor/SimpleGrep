@@ -1,0 +1,15 @@
+//writing logs to file
+    std::ofstream logstream;
+    logstream.open( logfilepath );
+    for(auto const& log : threadlogs)
+    {
+        logstream << log.first << ": ";
+        for(int i = 0; i < (int)log.second.size(); i++)
+        {
+            logstream << log.second[i];
+            if( i + 1 != (int)log.second.size() )
+                logstream << ",";
+        }
+        logstream << "\n";
+    }
+    logstream.close();

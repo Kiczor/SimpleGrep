@@ -1,21 +1,16 @@
 #include "ThreadPool.h"
 
-//temp
-#include <iostream>
-
 ThreadPool::ThreadPool(int t)
 {
-    std::cout << "calling constructor t:" << t << "\n";
+    if( t <= 0 )
+        t = 1;
     ending = false;
     for(int i = 0; i < t; i++)
         threads.push_back( std::thread(&ThreadPool::WorkLoop, this) );
-    std::cout << threads.size() << "\n";
 }
 
 ThreadPool::~ThreadPool()
 {
-    std::cout << "calling destructor\n";
-
     {
         std::unique_lock<std::mutex> lock(queuemutex);
         ending = true;
@@ -30,13 +25,11 @@ ThreadPool::~ThreadPool()
     }
 }
 
-void ThreadPool::AddWork(const std::function<void()>& work)
+void ThreadPool::AddWork(const std::function<void()>& work, std::string filename)
 {
     std::unique_lock<std::mutex> lock(queuemutex);
 
-    std::cout << "adding work\n";
-
-    workqueue.push(work);
+    workqueue.push( make_pair(work, filename) );
 
     workqueuecondvar.notify_one();
 }
@@ -45,22 +38,18 @@ void ThreadPool::WorkLoop()
 {
     while( true )
     {
-        std::cout << "working in work loop\n";
         std::function<void()> work;
         {
             std::unique_lock<std::mutex> lock(queuemutex);
-            workqueuecondvar.wait( lock, [&] {
-                return !workqueue.empty() || ending;
-            });
-
-            std::cout << "ending: " << ending << ", queue size: " << workqueue.size() << "\n";
+            workqueuecondvar.wait( lock, [&] { return !workqueue.empty() || ending; });
 
             if( ending ) break;
 
-            std::cout << "got work to do\n";
-
-            work = workqueue.front();
+            work = workqueue.front().first;
+            std::string workfilename = workqueue.front().second;
             workqueue.pop();
+
+            filelogs[ std::this_thread::get_id() ].push_back(workfilename);
         }
 
         work();
