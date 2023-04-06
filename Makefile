@@ -1,5 +1,5 @@
-simplegrep: simplegrep.cpp
-	g++ -lstdc++fs -std=c++17 -Wall    simplegrep.cpp   -o simplegrep -lstdc++fs
+simplegrep: simplegrep.cpp ThreadPool.cpp
+	g++ -pthread -lstdc++fs -std=c++17 -Wall   ThreadPool.cpp simplegrep.cpp   -o simplegrep -lstdc++fs
 clean:
 	rm simplegrep
 	rm *.txt

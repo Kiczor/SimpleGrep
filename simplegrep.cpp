@@ -7,9 +7,11 @@
 #include <iostream>
 #include <fstream>
 #include <sys/time.h>
+#include <map>
+#include "ThreadPool.h"
 
 std::string logfilepath, resultfilepath, dirpath, pattern;
-int threads;
+int threadnumber;
 
 //global stats
 int searched_files, files_with_pattern;
@@ -18,9 +20,17 @@ timeval start_time;
 typedef std::pair<std::string, std::pair<int, std::string> > fileline;
 
 std::vector<fileline> found;
+std::map<unsigned long long int, std::vector<std::string> > threadlogs;
+
+std::mutex foundmutex;
 
 void SeekInFile( std::string path, std::string pattern )
 {
+    {
+         std::unique_lock<std::mutex> lock(foundmutex);
+         std::cout << "seeking in file: |" << path << "| for pattern: |" << pattern << "|\n";
+    }
+
     std::regex patternregex( pattern );
 
     std::ifstream filestream(path);
@@ -29,9 +39,11 @@ void SeekInFile( std::string path, std::string pattern )
     int count = 0;
     while( getline( filestream, line ) )
     {
-        count ++;
+        count++;
         if( std::regex_search( line, patternregex ) )
         {
+            std::unique_lock<std::mutex> lock(foundmutex);
+            std::cout << line << "\n";
             //add to results (mutex chyba tu powinien byc)
             found.push_back( make_pair( path, make_pair( count, line ) ) );
         }
@@ -44,10 +56,10 @@ int main(int argc, char** argv)
 {
     gettimeofday(&start_time, 0);
 
-    dirpath = "";
+    dirpath = ".";
     logfilepath = "logfile.txt";
     resultfilepath = "resultfile.txt";
-    threads = 4;
+    threadnumber = 4;
 
     int c;
     while( 1 ) // handling options
@@ -72,12 +84,16 @@ int main(int argc, char** argv)
         {
             case 'd':
                 dirpath = optarg;
+                break;
             case 'l':
                 logfilepath = optarg;
+                break;
             case 'r':
                 resultfilepath = optarg;
+                break;
             case 't':
-                threads = atoi( optarg );
+                threadnumber = atoi( optarg );
+                break;
             case '?':
                 break;
         }
@@ -85,13 +101,17 @@ int main(int argc, char** argv)
 
     pattern = argv[ argc - 1 ];
 
-    //iterating directory
-    for (const auto& direntry : std::filesystem::recursive_directory_iterator("."))
+    const std::filesystem::path fspath = dirpath;
+
+    ThreadPool* mythreadpool = new ThreadPool(threadnumber);
+    for (const auto& direntry : std::filesystem::recursive_directory_iterator(fspath))
     {
         std::cout << direntry << std::endl;
-        SeekInFile( direntry.path(), pattern );
+        mythreadpool -> AddWork( [direntry] { SeekInFile( direntry.path(), pattern ); } );
         searched_files += 1;
     }
+    while( mythreadpool -> busy() ) {}
+    delete mythreadpool;
 
     sort( found.begin(), found.end() );
 
@@ -145,11 +165,11 @@ int main(int argc, char** argv)
     timersub( &end_time, &start_time, &time_difference );
 
     //ending output
-    std::cout << "Searched files: " << searched_files << "\n";
+    std::cout << "\n\nSearched files: " << searched_files << "\n";
     std::cout << "Files with pattern: " << files_with_pattern << "\n";
     std::cout << "Patterns number: " << found.size() << "\n";
     std::cout << "Result file: " << resultfilepath << "\n";
     std::cout << "Log file: " << logfilepath << "\n";
-    std::cout << "Used threads: " << threads << "\n";
+    std::cout << "Used threads: " << threadnumber << "\n";
     std::cout << "Elapsed time: " << time_difference.tv_sec << "[s], " << time_difference.tv_usec / 1000 << "[ms]" << "\n";
 }

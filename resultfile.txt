@@ -1,0 +1,3 @@
+exampledir/ex2.txt:2:for 
+exampledir/ex2.txt:1:for aa 
+exampledir/ex1.txt:1:for i in
