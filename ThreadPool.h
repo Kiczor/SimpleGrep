@@ -20,7 +20,7 @@ public:
     ThreadPool(int t);
     ~ThreadPool();
     void AddWork(const std::function<void()>& work, std::string filename);
-    bool busy();
+    bool Busy();
 
     std::map<std::thread::id, std::vector<std::string> > filelogs;
 };

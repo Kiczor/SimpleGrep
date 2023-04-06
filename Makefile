@@ -3,3 +3,4 @@ simplegrep: simplegrep.cpp ThreadPool.cpp
 clean:
 	rm simplegrep
 	rm *.txt
+	rm *.log

@@ -16,14 +16,14 @@ int threadnumber;
 int searched_files, files_with_pattern;
 timeval start_time;
 
-typedef std::pair<std::string, std::pair<int, std::string> > fileline;
+typedef std::pair<std::string, std::pair<int, std::string> > fileline; //typedef for lines to write to results
 
-std::vector<fileline> found;
-
-std::map<std::thread::id, std::vector<std::string> > threadlogs;
+std::vector<fileline> found; //found lines
+std::map<std::thread::id, std::vector<std::string> > threadlogs; //logs from thread pool
 
 std::mutex foundmutex;
 
+//performing regex search in file 
 void SeekInFile( std::string path, std::string pattern )
 {
     std::regex patternregex( pattern );
@@ -47,11 +47,25 @@ void SeekInFile( std::string path, std::string pattern )
 
 int main(int argc, char** argv)
 {
+    if( argc == 1 ) //too few arguments
+    {
+        std::cout << "To use this program provide obligatory parameter telling what pattern to seek for." << "\n"
+                << "Usage: ./simplegrep OPTIONS PATTERN" << "\n"
+                << "Available options:" << "\n"
+                << "-d, --dir -> choose starting directory" << "\n"
+                << "-l, --log_file -> custom log file name" << "\n"
+                << "-r, --result_file -> custom results file name" << "\n"
+                << "-t, --threads -> number of threads to use" << "\n\n"
+                << "Example of usage:" << "\n"
+                << " ./simplegrep -d \"exampledir\" -t 3 -l \"innelogi.txt\" -r \"inneresulty.txt\" \"for\" " << "\n";
+        return 0;
+    }
+
     gettimeofday(&start_time, 0);
 
     dirpath = ".";
-    logfilepath = "logfile.txt";
-    resultfilepath = "resultfile.txt";
+    logfilepath = "simplegrep.txt";
+    resultfilepath = "simplegrep.log";
     threadnumber = 4;
 
     int c;
@@ -94,15 +108,16 @@ int main(int argc, char** argv)
 
     pattern = argv[ argc - 1 ];
 
+    //starting thread pool and recursive iterating through directory
     const std::filesystem::path fspath = dirpath;
-
     ThreadPool* mythreadpool = new ThreadPool(threadnumber);
     for (const auto& direntry : std::filesystem::recursive_directory_iterator(fspath))
     {
         mythreadpool -> AddWork( [direntry] { SeekInFile( direntry.path(), pattern ); }, direntry.path().filename() );
         searched_files += 1;
     }
-    while( mythreadpool -> busy() ) {}
+    //waiting for all threads to finish work and ending thread pool
+    while( mythreadpool -> Busy() ) {}
     threadlogs = mythreadpool -> filelogs;
     delete mythreadpool;
 

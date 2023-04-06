@@ -56,7 +56,7 @@ void ThreadPool::WorkLoop()
     }
 }
 
-bool ThreadPool::busy() {
+bool ThreadPool::Busy() {
     bool poolbusy;
     {
         std::unique_lock<std::mutex> lock(queuemutex);
