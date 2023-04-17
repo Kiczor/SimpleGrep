@@ -17,6 +17,7 @@ int searched_files, files_with_pattern;
 timeval start_time;
 
 typedef std::pair<std::string, std::pair<int, std::string> > fileline; //typedef for lines to write to results
+typedef std::pair< std::thread::id, std::vector<std::string> > logtype; //typedef for logs
 
 std::vector<fileline> found; //found lines
 std::map<std::thread::id, std::vector<std::string> > threadlogs; //logs from thread pool
@@ -45,6 +46,13 @@ void SeekInFile( std::string path, std::string pattern )
     return;
 }
 
+bool threadcmp( logtype a, logtype b )
+{
+    if( a.second.size() == b.second.size() )
+        return a.first < b.first;
+    return a.second.size() < b.second.size();
+}
+
 int main(int argc, char** argv)
 {
     if( argc == 1 ) //too few arguments
@@ -64,8 +72,8 @@ int main(int argc, char** argv)
     gettimeofday(&start_time, 0);
 
     dirpath = ".";
-    logfilepath = "simplegrep.txt";
-    resultfilepath = "simplegrep.log";
+    logfilepath = "simplegrep.log";
+    resultfilepath = "simplegrep.txt";
     threadnumber = 4;
 
     int c;
@@ -113,13 +121,28 @@ int main(int argc, char** argv)
     ThreadPool* mythreadpool = new ThreadPool(threadnumber);
     for (const auto& direntry : std::filesystem::recursive_directory_iterator(fspath))
     {
+        if( direntry.is_directory() ) continue;
         mythreadpool -> AddWork( [direntry] { SeekInFile( direntry.path(), pattern ); }, direntry.path().filename() );
         searched_files += 1;
     }
     //waiting for all threads to finish work and ending thread pool
     while( mythreadpool -> Busy() ) {}
-    threadlogs = mythreadpool -> filelogs;
+    threadlogs = mythreadpool -> GetLogs();
     delete mythreadpool;
+    
+    //vector of pairs (thread id, files) used for sorting
+    std::vector< logtype > threadv;
+    for(const auto& log : threadlogs)
+        if( log.second.size() == 1 && log.second[0] == "" )
+        {
+            std::vector<std::string> emptylog;
+            threadv.push_back( make_pair( log.first, emptylog ) );
+        }
+        else
+            threadv.push_back( make_pair( log.first, log.second ) );
+
+    sort( threadv.begin(), threadv.end(), threadcmp );
+    reverse( threadv.begin(), threadv.end() );
 
     sort( found.begin(), found.end() );
 
@@ -133,6 +156,7 @@ int main(int argc, char** argv)
         currentpath = found[0].first;
         currentcount = 1;
         firstfound = 0;
+        files_with_pattern = 1;
         for(int i = 1; i < (int)found.size(); i++)
         {
             if( found[i].first != found[i - 1].first )
@@ -150,7 +174,7 @@ int main(int argc, char** argv)
         }
 
         for(int j = firstfound; j < (int)found.size(); j++)
-                    linesbycount.push_back( make_pair( currentcount, found[j] ) );
+            linesbycount.push_back( make_pair( currentcount, found[j] ) );
     }
 
     //sorting from most patterns
@@ -167,7 +191,7 @@ int main(int argc, char** argv)
     //writing logs to file
     std::ofstream logstream;
     logstream.open( logfilepath );
-    for(auto const& log : threadlogs)
+    for(auto const& log : threadv)
     {
         logstream << log.first << ": ";
         for(int i = 0; i < (int)log.second.size(); i++)

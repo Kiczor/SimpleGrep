@@ -25,6 +25,16 @@ ThreadPool::~ThreadPool()
     }
 }
 
+std::map<std::thread::id, std::vector<std::string> > ThreadPool::GetLogs()
+{
+    for( auto& thread : threads )
+    {
+        if( filelogs.find(thread.get_id()) == filelogs.end() )
+            filelogs[thread.get_id()].push_back("");
+    }
+    return filelogs;
+}
+
 void ThreadPool::AddWork(const std::function<void()>& work, std::string filename)
 {
     std::unique_lock<std::mutex> lock(queuemutex);
