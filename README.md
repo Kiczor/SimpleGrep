@@ -8,3 +8,6 @@ Usage: ./simplegrep \[parameters\] pattern
 
 Example:
  ./simplegrep -d "exampledir" -t 3 -l "logs.txt" -r "results.txt" "for"
+
+
+ Very simple tests in "simpletesting.sh" script

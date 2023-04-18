@@ -150,10 +150,8 @@ int main(int argc, char** argv)
     std::vector< std::pair< int, fileline > > linesbycount;
 
     int currentcount = 0, firstfound = 0;
-    std::string currentpath = "";
     if( found.size() > 0 )
     {
-        currentpath = found[0].first;
         currentcount = 1;
         firstfound = 0;
         files_with_pattern = 1;
@@ -165,7 +163,6 @@ int main(int argc, char** argv)
                     linesbycount.push_back( make_pair( currentcount, found[j] ) );
 
                 currentcount = 0;
-                currentpath = found[i].first;
                 firstfound = i;
 
                 files_with_pattern ++;
