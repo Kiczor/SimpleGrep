@@ -3,6 +3,7 @@
 #include <vector>
 #include <queue>
 #include <map>
+#include <string>
 #include <condition_variable>
 #include <functional>
 
